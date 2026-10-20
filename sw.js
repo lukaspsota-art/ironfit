@@ -2,7 +2,7 @@
 // so a page never mixes modules from two releases. Bump VERSION on every deploy: the browser then
 // installs the new set in the background and the next launch uses it.
 // The HTML page itself is network-first (fresh when online), falling back to the cache when offline.
-const VERSION = 'ironfit-v5';
+const VERSION = 'ironfit-v6';
 const ASSETS = [
   './',
   'index.html',

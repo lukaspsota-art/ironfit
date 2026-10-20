@@ -69,6 +69,8 @@ small, .muted { color: var(--muted); }
 }
 .logo { font-family: var(--display); font-weight: 800; font-size: 1.35rem; text-transform: uppercase; color: var(--text); text-decoration: none; }
 .logo b { color: var(--accent); }
+:root[data-theme='light'] .logo b { color: #345300; }
+#excl label.row { min-height: 44px; margin: 0 !important; }
 .top .spacer { flex: 1; }
 main { max-width: 760px; margin: 0 auto; padding: 16px; }
 .nav {

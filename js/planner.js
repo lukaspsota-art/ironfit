@@ -17,9 +17,9 @@ export const LEVELS = {
 
 // Movement-pattern slots per day, most important first (trimmed by session length).
 const T = {
-  fullA: ['Celé telo A', ['squat', 'hpush', 'vpull', 'hinge', 'lateral', 'biceps', 'calf']],
-  fullB: ['Celé telo B', ['hinge', 'vpush', 'hpull', 'lunge', 'chestIso', 'triceps', 'core']],
-  fullC: ['Celé telo C', ['squat', 'hpush', 'hpull', 'kneeFlex', 'rearDelt', 'calf', 'core']],
+  fullA: ['Celé telo A', ['squat', 'hpush', 'vpull', 'hinge', 'biceps', 'lateral', 'calf']],
+  fullB: ['Celé telo B', ['hinge', 'vpush', 'hpull', 'lunge', 'triceps', 'chestIso', 'core']],
+  fullC: ['Celé telo C', ['squat', 'hpush', 'hpull', 'kneeFlex', 'lateral', 'rearDelt', 'calf']],
   upper1: ['Horná časť A', ['hpush', 'vpull', 'vpush', 'hpull', 'lateral', 'triceps', 'biceps']],
   upper2: ['Horná časť B', ['hpull', 'hpush', 'vpull', 'lateral', 'chestIso', 'biceps', 'rearDelt']],
   lower1: ['Spodná časť A', ['squat', 'hinge', 'kneeExt', 'kneeFlex', 'calf', 'core', 'glute']],

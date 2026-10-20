@@ -478,7 +478,7 @@ export default [
     secondary: ['hamstrings', 'quads', 'core'],
     summary: 'Jeden z najlepších cvikov na sedacie svaly. Horný chrbát je opretý, boky tlačia závažie nahor.',
     setup: [
-      'Sadni si na zem, horný chrbát opri o okraj lavice (pod lopatkami).',
+      'Sadni si do stroja, horný chrbát opri o operadlo (pod lopatkami).',
       'Bedrový pás alebo podložku nastav tesne nad panvové kosti.',
       'Chodidlá na šírku bokov, kolená v hornej polohe cca 90°.',
     ],
