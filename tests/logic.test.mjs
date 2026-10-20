@@ -208,3 +208,25 @@ test('plan quality: strength uses main barbell lifts, volume capped, adductors n
     assert.ok(!p.days.some((d) => d.items.some((i) => i.exId === 'hip-adduction')));
   }
 });
+
+test('progression ignores warm-ups but needs every working set at the top', () => {
+  const item = { exId: 'chest-press', pattern: 'hpush', sets: 3, repsMin: 8, repsMax: 12 };
+  const ex = exById['chest-press'];
+  // warm-up at 30 kg doesn't block, all 3 working sets hit 12
+  assert.equal(suggest(item, ex, [W(1, 'chest-press', [[30, 8], [50, 12], [50, 12], [50, 12]])]).trend, 'up');
+  // one heavy top set + failed back-offs is not a pass
+  assert.equal(suggest(item, ex, [W(1, 'chest-press', [[50, 12], [45, 7], [45, 6]])]).trend, 'same');
+});
+
+test('normalize rebuilds active workout targets', async () => {
+  const { normalize } = await import('../js/store.js');
+  const s = normalize({ active: { started: 1, entries: [{ exId: 'chest-press', sets: [{ kg: 10, reps: 5 }] }] } });
+  const e = s.active.entries[0];
+  assert.ok(e.target.sets >= 1 && e.target.repsMin <= e.target.repsMax);
+  assert.equal(e.sug.trend, 'new');
+});
+
+test('advanced plans avoid unloadable bodyweight moves when loadable options exist', () => {
+  const p = generatePlan({ days: 6, goal: 'hypertrofia', level: 'pokrocily', minutes: 90 }, EXERCISES, 1);
+  assert.ok(!p.days.some((d) => d.items.some((i) => i.exId === 'push-up')));
+});

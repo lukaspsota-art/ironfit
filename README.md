@@ -17,8 +17,10 @@ Tréningová webová aplikácia pre fitko **Iron University SK** (Bratislavská 
 
 ```bash
 npx serve .            # alebo akýkoľvek statický server
-node --test tests/     # unit testy logiky (plánovač, štatistiky, integrita dát)
+npm test               # unit testy logiky (plánovač, štatistiky, integrita dát)
 ```
+
+Pri každom nasadení zvýš `VERSION` v `sw.js`, aby si offline cache stiahla novú verziu naraz.
 
 `tools/preview.html?ids=leg-press,bench-press` zobrazí animácie vybraných cvikov vo fázach 0 / 0,5 / 1.
 

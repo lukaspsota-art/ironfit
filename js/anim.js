@@ -262,7 +262,10 @@ export function mountPlayer(container, anim, { label = 'Animácia cviku' } = {})
     btn.textContent = on ? '❚❚' : '▶';
     btn.setAttribute('aria-label', on ? 'Pozastaviť animáciu' : 'Spustiť animáciu');
     if (on) {
-      t0 = performance.now();
+      // resume from the scrubbed position instead of jumping back to the start
+      const p = range.value / 1000;
+      const at = !p ? 0 : motion === 'loop' ? p : motion === 'lower' ? 0.11 + p * 0.39 : 0.11 + p * 0.33;
+      t0 = performance.now() - at * D;
       raf = requestAnimationFrame(tick);
     }
   };

@@ -243,7 +243,7 @@ const BASE = [
       motion: 'lower',
       fix: ['ankle', 100, 176],
       machine: [post(150, 40), ['line', { x1: 142, y1: 66, x2: 154, y2: 66 }], ['line', { x1: 142, y1: 128, x2: 160, y2: 128 }]],
-      gear: [{ kind: 'barbell', at: 'shoulder', offset: [-7, 1] }],
+      gear: [{ kind: 'barbell', at: 'shoulder', offset: [-13, 5] }],
       poses: [
         { torso: 0, thigh: 180, shin: 180, foot: 90, uarm: 205, farm: 28 },
         { torso: 42, thigh: 98, shin: 208, foot: 90, uarm: 240, farm: 70 },

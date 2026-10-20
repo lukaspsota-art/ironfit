@@ -25,9 +25,8 @@
   --line: #d9ddd5;
   --text: #15181b;
   --muted: #5d6670;
-  --accent: #4f7d00;
+  --accent: #456e00;
   --accent-ink: #ffffff;
-  --accent2: #d4600f;
   --body: #2b3138;
   --machine: #7a838d;
   --control-line: #7d8690;
@@ -161,6 +160,7 @@ ul.good li::marker { content: '✓  '; color: var(--ok); }
 .fx-ctrl input { flex: 1; }
 .fx-phase { font-size: 0.8rem; color: var(--muted); min-width: 9.5em; text-align: right; }
 .fx-label { fill: var(--muted); font: 600 10px var(--font); }
+.thumb .fx-label { display: none; }
 .fx-floor { stroke: var(--line); stroke-width: 2; }
 .fx-machine line, .fx-machine rect:not(.fx-frame), .fx-machine path { stroke: var(--machine); stroke-width: 4; stroke-linecap: round; fill: none; }
 .fx-machine rect:not(.fx-frame) { fill: var(--machine); stroke-width: 0; }

@@ -4,7 +4,8 @@ import { createFigure, mountPlayer } from './anim.js';
 import { records, exerciseHistory, newRecords, workoutRecords, muscleFatigue, weeklySets, plates, streakWeeks, doneSets, e1rm } from './stats.js';
 import { GOALS, LEVELS, SPLIT_NAMES, generatePlan, swapItem, suggest, nextDayIndex, planWeek, isDeload } from './planner.js';
 
-const exById = Object.fromEntries(EXERCISES.map((e) => [e.id, e]));
+// null prototype: imported ids like 'constructor' must not resolve to Object internals
+const exById = Object.assign(Object.create(null), Object.fromEntries(EXERCISES.map((e) => [e.id, e])));
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 const S = () => store.get();
@@ -22,7 +23,7 @@ const fmtDate = (t, opts = { day: 'numeric', month: 'numeric', year: 'numeric' }
 const fmtDur = (sec) => {
   const m = Math.round(sec / 60);
   if (m < 1) return '<1 min';
-  return m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`;
+  return m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}` : `${m} min`;
 };
 const mm = (sec) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
 const muscles = (list) => list.map((m) => MUSCLES[m]).join(', ');
@@ -34,8 +35,13 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 // ---------- UI feedback ----------
 let toastTimer;
 function toast(msg) {
+  // persistent live region (screen readers often ignore freshly inserted ones) + visual toast
+  const live = $('#live');
+  live.textContent = '';
+  setTimeout(() => { live.textContent = msg; }, 50);
   $('.toast')?.remove();
-  const t = Object.assign(document.createElement('div'), { className: 'toast', role: 'status', textContent: msg });
+  const t = Object.assign(document.createElement('div'), { className: 'toast', textContent: msg });
+  t.setAttribute('aria-hidden', 'true');
   document.body.appendChild(t);
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.remove(), 3200);
@@ -238,6 +244,7 @@ function viewToday() {
     });
     main = html`<section class="card hero">
       <div class="row between"><small>Týždeň ${planWeek(p)} · ${SPLIT_NAMES[p.settings.days]}</small>${deload ? html`<span class="chip warn">Deload týždeň</span>` : ''}</div>
+      ${p.settings.level === 'zaciatocnik' && planWeek(p) >= 8 ? html`<p class="hint up">Trénuješ už ${planWeek(p)} týždňov 💪 Skús v <a href="#/plan">Pláne</a> zvoliť „Mierne pokročilý“ — pribudnú cviky s voľnými váhami.</p>` : ''}
       <h1>${day.name}</h1>
       <ul class="list">${day.items.map((it) => {
         const ex = exById[it.exId];
@@ -590,7 +597,7 @@ function viewExercise(id) {
   <div class="chips">${ex.primary.map((m) => html`<span class="chip p">${MUSCLES[m]}</span>`)}${ex.secondary.map((m) => html`<span class="chip">${MUSCLES[m]}</span>`)}</div>
   <p class="muted" style="font-size:.8rem">Zvýraznené = hlavné svaly, ostatné = pomocné.</p>
   ${inWorkout ? html`<button class="btn primary block" id="add-to" style="margin-bottom:14px">+ Pridať do tréningu</button>` : ''}
-  <section class="card"><h2>Nastavenie stroja</h2><ol class="steps">${ex.setup.map((s) => html`<li>${s}</li>`)}</ol></section>
+  <section class="card"><h2>${['machine', 'cable'].includes(ex.equip) ? 'Nastavenie stroja' : 'Príprava'}</h2><ol class="steps">${ex.setup.map((s) => html`<li>${s}</li>`)}</ol></section>
   <section class="card"><h2>Postup</h2><ol class="steps">${ex.steps.map((s) => html`<li>${s}</li>`)}</ol></section>
   <section class="card"><h2>Časté chyby</h2><ul class="bad">${ex.mistakes.map((s) => html`<li>${s}</li>`)}</ul></section>
   ${ex.tips?.length ? html`<section class="card"><h2>Tipy</h2><ul class="good">${ex.tips.map((s) => html`<li>${s}</li>`)}</ul></section>` : ''}
@@ -827,6 +834,6 @@ renderTimer();
 requestWakeLock();
 store.persist();
 
-if ('serviceWorker' in navigator && location.protocol === 'https:') {
+if ('serviceWorker' in navigator && isSecureContext) {
   navigator.serviceWorker.register('./sw.js').catch(() => {});
 }

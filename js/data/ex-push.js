@@ -220,7 +220,7 @@ export default [
     increment: 2.5,
     primary: ['chest'],
     secondary: ['shoulders'],
-    summary: 'Izolačný cvik s plynulým odporom po celý rozsah. Skvelý na vypracovanie spodnej a vnútornej časti prsí.',
+    summary: 'Izolačný cvik s plynulým odporom po celý rozsah. Skvelý doplnok k tlakom — prsia pracujú v plnom rozsahu.',
     setup: [
       'Kladky nastav vysoko, na každú rukoväť rovnakú záťaž.',
       'Postav sa do stredu veží, jednu nohu predkroč, trup mierne predkloň.',
@@ -306,7 +306,7 @@ export default [
       'Chyť tyč mierne širšie ako ramená a otoč ju pre odistenie.',
     ],
     steps: [
-      'Odistene tyč a spusti ju k brade.',
+      'Odisti tyč a spusti ju k brade.',
       'S výdychom ju vytlač nahor, kým nie sú ruky takmer vystreté.',
       'S nádychom ju pomaly spusti späť pred tvár, lakte pod zápästiami.',
     ],
@@ -512,7 +512,7 @@ export default [
       'Príliš veľká váha, tyč padne na tvár.',
       'Zapájanie ramien a tlak ako pri bench presse.',
     ],
-    tips: ['Pri väčšej váhe nechaj partnera pomôcť s nasadením tyče.', 'Spusti tyč za hlavu, ak ťa to menej namáha lakte.'],
+    tips: ['Pri väčšej váhe nechaj partnera pomôcť s nasadením tyče.', 'Spusti tyč za hlavu, ak ti to menej namáha lakte.'],
     anim: {
       hl: ['arm'],
       machine: [...bench(34, 130, 150)],

@@ -212,19 +212,19 @@ export default [
     summary: 'Zdvih činky zo zeme. Celotelový cvik, kde je kľúčový neutrálny chrbát a spevnený stred tela.',
     setup: [
       'Postav sa k činke, chodidlá na šírku bokov, tyč nad strednou časťou chodidla.',
-      'Chyť tyč tesne za holeňami. Bedrá spusti tak, aby sa holene dotýkali tyče.',
+      'Chyť tyč tesne vedľa holení (ruky mimo nôh). Bedrá spusti tak, aby sa holene dotýkali tyče.',
       'Hrudník vystrč, lopatky stiahni, chrbát celý neutrálny.',
     ],
     steps: [
       'S nádychom spevni brucho tak, ako keby si čakal úder do žalúdka.',
       'Zatlač nohami do zeme, tyč ťahaj blízko po holeniach a stehnách.',
-      'Bedrá a ramená stúpajú spolu, chrbát sa nezaguľacuje.',
+      'Bedrá a ramená stúpajú spolu, chrbát sa nezaguľatí.',
       'Hore sa celkom vystri, stlač zadok a nespúšťaj sa dozadu.',
       'S kontrolou spusť tyč naspäť rovnakou dráhou.',
     ],
     mistakes: [
       'Zaguľatý spodný chrbát — ak sa ti to stáva, zníž váhu.',
-      'Tyč je vo vzdialenosti od tela.',
+      'Tyč sa vzďaľuje od tela.',
       'Bedrá vystrelia hore skôr než ramená.',
       'Záklon chrbta v hornej polohe.',
     ],
@@ -675,7 +675,7 @@ export default [
       hl: ['thigh'],
       fix: ['toe', 112, 164],
       machine: [post(100, 14), ['rect', { x: 86, y: 166, width: 40, height: 16, rx: 2 }]],
-      gear: [{ kind: 'barbell', at: 'shoulder', offset: [-7, 1] }],
+      gear: [{ kind: 'barbell', at: 'shoulder', offset: [-13, 5] }],
       poses: [
         { torso: 0, thigh: 180, shin: 180, foot: 45, uarm: 205, farm: 28 },
         { torso: 0, thigh: 180, shin: 180, foot: 155, uarm: 205, farm: 28 },
@@ -693,7 +693,7 @@ export default [
     increment: 0,
     primary: ['cardio'],
     secondary: ['quads', 'hamstrings', 'calves', 'glutes'],
-    summary: 'Chôdza alebo beh na páse. Chôdza do kopca je šetrná k kĺbom a dobre zvýši tep.',
+    summary: 'Chôdza alebo beh na páse. Chôdza do kopca je šetrná ku kĺbom a dobre zvýši tep.',
     setup: [
       'Pripni si bezpečnostnú šnúru k oblečeniu a postav sa na bočné lišty.',
       'Spusti pás pomaly (3–4 km/h) a nastúp na pás.',

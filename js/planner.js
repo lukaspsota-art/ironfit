@@ -21,7 +21,7 @@ const T = {
   fullB: ['Celé telo B', ['hinge', 'vpush', 'hpull', 'lunge', 'chestIso', 'triceps', 'core']],
   fullC: ['Celé telo C', ['squat', 'hpush', 'hpull', 'kneeFlex', 'rearDelt', 'calf', 'core']],
   upper1: ['Horná časť A', ['hpush', 'vpull', 'vpush', 'hpull', 'lateral', 'triceps', 'biceps']],
-  upper2: ['Horná časť B', ['hpull', 'hpush', 'vpull', 'chestIso', 'rearDelt', 'biceps', 'triceps']],
+  upper2: ['Horná časť B', ['hpull', 'hpush', 'vpull', 'lateral', 'chestIso', 'biceps', 'rearDelt']],
   lower1: ['Spodná časť A', ['squat', 'hinge', 'kneeExt', 'kneeFlex', 'calf', 'core', 'glute']],
   lower2: ['Spodná časť B', ['hinge', 'lunge', 'glute', 'kneeFlex', 'kneeExt', 'calf', 'core']],
   push: ['Push (tlaky)', ['hpush', 'vpush', 'hpush', 'chestIso', 'lateral', 'triceps', 'triceps']],
@@ -44,7 +44,7 @@ const slotsFor = (minutes) => (minutes <= 45 ? 4 : minutes <= 60 ? 5 : minutes <
 // Lower = preferred, per goal. Strength favours loadable, stable lifts.
 const EQUIP_RANK = {
   sila: { barbell: 0, machine: 1, dumbbell: 2, cable: 3, kettlebell: 5, bodyweight: 5, cardio: 0 },
-  hypertrofia: { machine: 0, barbell: 0, dumbbell: 0, cable: 1, bodyweight: 2, kettlebell: 3, cardio: 0 },
+  hypertrofia: { machine: 0, barbell: 0, dumbbell: 0, cable: 1, bodyweight: 4, kettlebell: 3, cardio: 0 },
   kondicia: { machine: 0, dumbbell: 0, cable: 0, kettlebell: 0, bodyweight: 0, barbell: 1, cardio: 0 },
 };
 
@@ -60,7 +60,10 @@ function scheme(ex, goal, level) {
 }
 
 export function candidates(pattern, exercises, { level = 'pokrocily', exclude = [], goal = 'hypertrofia' } = {}) {
-  const ok = exercises.filter((e) => e.pattern === pattern && !exclude.includes(e.id));
+  let ok = exercises.filter((e) => e.pattern === pattern && !exclude.includes(e.id));
+  // unloadable bodyweight moves can't follow load progression; drop them when there are loadable options
+  const loadable = ok.filter((e) => e.equip !== 'bodyweight');
+  if (goal !== 'kondicia' && level !== 'zaciatocnik' && loadable.length >= 3) ok = loadable;
   const easy = ok.filter((e) => e.level <= LEVELS[level].maxLevel);
   const rank = EQUIP_RANK[goal] || EQUIP_RANK.hypertrofia;
   const beginner = level === 'zaciatocnik';
@@ -126,14 +129,15 @@ function balanceVolume(days, exById, { goal, level, minutes }) {
 
 export function generatePlan(settings, exercises, seed = Date.now()) {
   const { days, goal, level, minutes, exclude = [] } = settings;
-  const exById = Object.fromEntries(exercises.map((e) => [e.id, e]));
+  const exById = Object.assign(Object.create(null), Object.fromEntries(exercises.map((e) => [e.id, e])));
   const used = {}; // pattern -> times used in plan, so repeated slots rotate variants
   const slots = slotsFor(minutes);
   const planDays = SPLITS[days].map((key) => {
     const [name, patterns] = T[key];
     const items = [];
     for (const pattern of patterns) {
-      if (items.length >= slots) break;
+      // upper-body days get one extra quick isolation slot so arms / delts are not always cut
+      if (items.length >= slots + (/^(upper|push|pull)/.test(key) ? 1 : 0)) break;
       const pool = candidates(pattern, exercises, { level, exclude, goal }).filter((e) => !items.some((i) => i.exId === e.id));
       if (!pool.length) continue;
       const k = used[pattern] ?? 0;
@@ -207,13 +211,14 @@ export function suggest(item, ex, workouts, { deload = false } = {}) {
     return { kg: null, sets, note: `Prvýkrát: zvoľ váhu, s ktorou dáš ${item.repsMax} opakovaní a 2 by ešte išli.`, trend: 'new' };
   const last = sessions[0];
   const kg = Math.max(...last.map((s) => s.kg || 0));
-  const top = last.filter((s) => (s.kg || 0) === kg);
   if (kg === 0) {
     const best = Math.max(...last.map((s) => s.reps));
     return { kg: 0, sets, note: `Vlastná váha — minule max ${best} opak., skús o 1 viac.`, trend: 'same' };
   }
   if (deload) return { kg: lighter(kg, step), sets, note: 'Deload týždeň: menej sérií, ľahšia váha, regenerácia.', trend: 'down' };
-  const allHit = last.length >= item.sets && top.every((s) => s.reps >= item.repsMax);
+  // every working set (≥ 80 % of the top weight; lighter ones are warm-ups) must hit the top of the range
+  const working = last.filter((s) => (s.kg || 0) >= kg * 0.8);
+  const allHit = working.length >= item.sets && working.every((s) => s.reps >= item.repsMax);
   if (allHit) return { kg: kg + step, sets, note: `Minule ${kg} kg × ${item.repsMax}+ vo všetkých sériách → pridaj ${step} kg.`, trend: 'up' };
   const missed = (ss) => ss.some((s) => s.reps < item.repsMin);
   if (sessions.length === 2 && missed(sessions[0]) && missed(sessions[1]) && Math.max(...sessions[1].map((s) => s.kg || 0)) === kg) {

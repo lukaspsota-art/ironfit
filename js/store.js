@@ -78,7 +78,17 @@ function cleanActive(a) {
     prs: cleanPrs(a.prs),
     entries: a.entries
       .filter((e) => e && typeof e.exId === 'string')
-      .map((e) => ({ ...e, sets: cleanSets(e.sets).map((x) => ({ kg: x.kg === '' ? '' : num(x.kg), reps: x.reps === '' ? '' : num(x.reps), done: !!x.done })) })),
+      .map((e) => {
+        const t = e.target && typeof e.target === 'object' ? e.target : {};
+        const g = e.sug && typeof e.sug === 'object' ? e.sug : {};
+        const repsMin = num(t.repsMin, 1) || 8;
+        return {
+          exId: e.exId,
+          target: { pattern: str(t.pattern), sets: Math.max(1, num(t.sets, 1)), repsMin, repsMax: Math.max(repsMin, num(t.repsMax, 1)), rest: num(t.rest) },
+          sug: { kg: Number.isFinite(+g.kg) && g.kg !== null && g.kg !== '' ? Math.max(0, +g.kg) : null, sets: Math.max(1, num(g.sets, 1)), note: str(g.note), trend: ['up', 'same', 'down', 'new'].includes(g.trend) ? g.trend : 'new' },
+          sets: cleanSets(e.sets).map((x) => ({ kg: x.kg === '' ? '' : num(x.kg), reps: x.reps === '' ? '' : num(x.reps), done: !!x.done })),
+        };
+      }),
   };
 }
 

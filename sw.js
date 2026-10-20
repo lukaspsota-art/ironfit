@@ -1,6 +1,8 @@
-// Offline support. App files: network-first (so a deploy never mixes old and new modules),
-// falling back to the precached copy when offline or the network is slow. Fonts: cache-first.
-const VERSION = 'ironfit-v3';
+// Offline support. All app files are precached together under one VERSION and served cache-first,
+// so a page never mixes modules from two releases. Bump VERSION on every deploy: the browser then
+// installs the new set in the background and the next launch uses it.
+// The HTML page itself is network-first (fresh when online), falling back to the cache when offline.
+const VERSION = 'ironfit-v4';
 const ASSETS = [
   './',
   'index.html',
@@ -46,28 +48,20 @@ self.addEventListener('fetch', (e) => {
   const font = url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com';
   if (url.origin !== location.origin && !font) return;
 
-  if (font) {
-    e.respondWith(caches.open(VERSION).then(async (cache) => {
-      const hit = await cache.match(req);
-      if (hit) return hit;
-      const res = await fetch(req);
-      if (res.ok || res.type === 'opaque') cache.put(req, res.clone());
-      return res;
-    }));
+  if (req.mode === 'navigate') {
+    const network = fetch(req);
+    // clone before respondWith can consume the body (this then() is registered first)
+    const copy = network.then((res) => (res.ok ? res.clone() : null));
+    e.waitUntil(copy.then((c) => c && caches.open(VERSION).then((cache) => cache.put('index.html', c))).catch(() => {}));
+    e.respondWith(Promise.race([network, timeout(4000)]).catch(async () => (await caches.match('index.html')) || network));
     return;
   }
 
-  const network = fetch(req, { cache: 'no-cache' }).then((res) => {
-    if (res.ok) {
-      const copy = res.clone();
-      e.waitUntil(caches.open(VERSION).then((c) => c.put(req, copy)));
-    }
-    return res;
-  });
-  e.respondWith(
-    Promise.race([network, timeout(3000)]).catch(async () => {
-      const hit = await caches.match(req, { ignoreSearch: true }) || (req.mode === 'navigate' && await caches.match('index.html'));
-      return hit || network;
-    }),
-  );
+  // assets + fonts: cache-first; anything not precached is fetched once and stored
+  const res = caches.match(req, { ignoreSearch: !font }).then((hit) => hit || fetch(req).then(async (r) => {
+    if (r.ok || r.type === 'opaque') await (await caches.open(VERSION)).put(req, r.clone());
+    return r;
+  }));
+  e.respondWith(res);
+  e.waitUntil(res.catch(() => {}));
 });
