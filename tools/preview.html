@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<title>Animation preview</title>
+<link rel="stylesheet" href="../css/styles.css">
+<style>
+  body { padding: 10px; }
+  .g { display: grid; grid-template-columns: repeat(4, 220px); gap: 8px; }
+  .c { background: var(--card); padding: 4px; border-radius: 8px; }
+  .c svg { width: 100%; aspect-ratio: 1; background: var(--bg2); }
+  .c p { margin: 0; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="g" id="g"></div>
+<script type="module">
+import { EXERCISES } from '../js/data/exercises.js';
+import { createFigure } from '../js/anim.js';
+const only = new URLSearchParams(location.search).get('ids');
+const list = only ? EXERCISES.filter((e) => only.split(',').includes(e.id)) : EXERCISES;
+const g = document.getElementById('g');
+for (const ex of list) {
+  for (const p of [0, 0.5, 1]) {
+    const c = document.createElement('div');
+    c.className = 'c';
+    c.innerHTML = `<svg></svg><p>${ex.id} p=${p}</p>`;
+    g.appendChild(c);
+    createFigure(c.querySelector('svg'), ex.anim).set(p);
+  }
+  g.appendChild(Object.assign(document.createElement('div'), { className: 'c', innerHTML: `<p>${ex.name}</p>` }));
+}
+document.body.dataset.ready = '1';
+</script>
+</body>
+</html>
