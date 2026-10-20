@@ -173,7 +173,7 @@ const BASE = [
       props: [{ type: 'lever', from: [122, 32], to: 'wrist' }],
       gear: [{ kind: 'handle', at: 'wrist' }],
       poses: [
-        { hip: [76, 140], torso: -4, thigh: 92, shin: 180, uarm: 212, farm: 82 },
+        { hip: [76, 140], torso: -4, thigh: 92, shin: 180, uarm: 200, farm: 75 },
         { hip: [76, 140], torso: -4, thigh: 92, shin: 180, uarm: 92, farm: 90 },
       ],
     },

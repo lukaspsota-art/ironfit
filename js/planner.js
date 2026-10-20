@@ -88,6 +88,11 @@ export function planVolume(days, exById) {
   return v;
 }
 
+// Estimated session length in seconds: warm-up + per set (work + prescribed rest) + cardio minutes.
+const SET_SEC = 40;
+const WARMUP_SEC = 8 * 60;
+export const dayTime = (day) => WARMUP_SEC + day.items.reduce((t, it) => t + (it.pattern === 'cardio' ? it.repsMin * 60 : it.sets * (SET_SEC + it.rest)), 0);
+
 const TARGET = ['chest', 'back', 'quads', 'hamstrings', 'glutes', 'sidedelts', 'biceps', 'triceps', 'calves'];
 const MAX_WEEK = 20;
 
@@ -95,11 +100,19 @@ const MAX_WEEK = 20;
 function balanceVolume(days, exById, { goal, level, minutes }) {
   const minWeek = level === 'zaciatocnik' ? 8 : 10;
   const maxItemSets = goal === 'sila' ? 5 : 4;
-  const perSet = GOALS[goal].compound.rest + 50; // seconds per set incl. the work itself
-  const dayCap = Math.floor((minutes * 60) / perSet);
-  const items = days.flatMap((d) => d.items.filter((it) => it.pattern !== 'cardio').map((it) => ({ it, d })));
-  const daySets = (d) => d.items.reduce((n, it) => n + (it.pattern === 'cardio' ? 0 : it.sets), 0);
+  const budget = minutes * 60;
   const hits = (it, m) => exById[it.exId]?.primary.includes(m);
+  // first make every day fit the chosen session length: fewer sets on the biggest items, then drop the last slot
+  for (const d of days) {
+    while (dayTime(d) > budget) {
+      const lifts = d.items.filter((it) => it.pattern !== 'cardio');
+      const big = lifts.filter((it) => it.sets > 2).sort((a, b) => b.sets - a.sets || d.items.indexOf(b) - d.items.indexOf(a))[0];
+      if (big) big.sets--;
+      else if (lifts.length > 3) d.items.splice(d.items.indexOf(lifts.at(-1)), 1);
+      else break;
+    }
+  }
+  const items = days.flatMap((d) => d.items.filter((it) => it.pattern !== 'cardio').map((it) => ({ it, d })));
   // trim excess first
   for (;;) {
     const v = planVolume(days, exById);
@@ -115,7 +128,7 @@ function balanceVolume(days, exById, { goal, level, minutes }) {
     const v = planVolume(days, exById);
     for (const m of TARGET.filter((x) => (v[x] || 0) < minWeek).sort((a, b) => (v[a] || 0) - (v[b] || 0))) {
       const cand = items
-        .filter(({ it, d }) => hits(it, m) && it.sets < maxItemSets && daySets(d) < dayCap
+        .filter(({ it, d }) => hits(it, m) && it.sets < maxItemSets && dayTime(d) + it.rest + SET_SEC <= budget
           && exById[it.exId].primary.every((pm) => (v[pm] || 0) + 1 <= MAX_WEEK))
         .sort((a, b) => a.it.sets - b.it.sets)[0];
       if (cand) {
@@ -186,12 +199,14 @@ export const isDeload = (plan, now = Date.now()) => planWeek(plan, now) % 6 === 
 export function nextDayIndex(plan, workouts) {
   for (let i = workouts.length - 1; i >= 0; i--) {
     const w = workouts[i];
-    if (w.planId === plan.id && w.dayIdx != null) return (w.dayIdx + 1) % plan.days.length;
+    if (w.planId === plan.id && Number.isInteger(w.dayIdx) && w.dayIdx >= 0) return (w.dayIdx + 1) % plan.days.length;
   }
   return 0;
 }
 
 const roundTo = (x, step) => Math.round(x / step) * step;
+// Slovak decimal comma for user-facing notes
+const f = (n) => String(Math.round(n * 100) / 100).replace('.', ',');
 // ~10 % lighter, but always at least one step lighter (small loads would otherwise round back up)
 const lighter = (kg, step) => Math.max(0, Math.min(kg - step, roundTo(kg * 0.9, step)));
 
@@ -219,10 +234,14 @@ export function suggest(item, ex, workouts, { deload = false } = {}) {
   // every working set (≥ 80 % of the top weight; lighter ones are warm-ups) must hit the top of the range
   const working = last.filter((s) => (s.kg || 0) >= kg * 0.8);
   const allHit = working.length >= item.sets && working.every((s) => s.reps >= item.repsMax);
-  if (allHit) return { kg: kg + step, sets, note: `Minule ${kg} kg × ${item.repsMax}+ vo všetkých sériách → pridaj ${step} kg.`, trend: 'up' };
-  const missed = (ss) => ss.some((s) => s.reps < item.repsMin);
+  if (allHit) return { kg: kg + step, sets, note: `Minule ${f(kg)} kg × ${item.repsMax}+ vo všetkých sériách → pridaj ${f(step)} kg.`, trend: 'up' };
+  // only working sets count as a miss (warm-ups are lighter than 80 % of that session's top)
+  const missed = (ss) => {
+    const top = Math.max(...ss.map((s) => s.kg || 0));
+    return ss.some((s) => (s.kg || 0) >= top * 0.8 && s.reps < item.repsMin);
+  };
   if (sessions.length === 2 && missed(sessions[0]) && missed(sessions[1]) && Math.max(...sessions[1].map((s) => s.kg || 0)) === kg) {
-    return { kg: lighter(kg, step), sets, note: `2× pod ${item.repsMin} opak. pri ${kg} kg → uber 10 % a buduj znova.`, trend: 'down' };
+    return { kg: lighter(kg, step), sets, note: `2× pod ${item.repsMin} opak. pri ${f(kg)} kg → uber 10 % a buduj znova.`, trend: 'down' };
   }
-  return { kg, sets, note: `Zostaň na ${kg} kg a skús pridať opakovanie (cieľ ${item.repsMax}).`, trend: 'same' };
+  return { kg, sets, note: `Zostaň na ${f(kg)} kg a skús pridať opakovanie (cieľ ${item.repsMax}).`, trend: 'same' };
 }

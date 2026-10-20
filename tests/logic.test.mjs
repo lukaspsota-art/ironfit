@@ -230,3 +230,29 @@ test('advanced plans avoid unloadable bodyweight moves when loadable options exi
   const p = generatePlan({ days: 6, goal: 'hypertrofia', level: 'pokrocily', minutes: 90 }, EXERCISES, 1);
   assert.ok(!p.days.some((d) => d.items.some((i) => i.exId === 'push-up')));
 });
+
+test('warm-up sets never trigger a stall deload', () => {
+  const item = { exId: 'bench-press', pattern: 'hpush', sets: 3, repsMin: 6, repsMax: 10 };
+  const s = [[40, 5], [80, 8], [80, 8], [80, 7]];
+  const r = suggest(item, exById['bench-press'], [W(1, 'bench-press', s), W(2, 'bench-press', s)]);
+  assert.equal(r.trend, 'same');
+  assert.equal(r.kg, 80);
+  assert.match(suggest(item, exById['bench-press'], [W(1, 'bench-press', [[62.5, 10], [62.5, 10], [62.5, 10]])]).note, /65 kg|2,5 kg/);
+});
+
+test('every generated day fits the chosen session length', async () => {
+  const { dayTime } = await import('../js/planner.js');
+  for (const days of [2, 3, 4, 5, 6]) for (const goal of ['sila', 'hypertrofia', 'kondicia'])
+    for (const level of ['zaciatocnik', 'mierne', 'pokrocily']) for (const minutes of [45, 60, 75, 90]) {
+      const p = generatePlan({ days, goal, level, minutes }, EXERCISES, 1);
+      for (const d of p.days) assert.ok(dayTime(d) <= minutes * 60, `${days}/${goal}/${level}/${minutes} ${d.name} ${Math.round(dayTime(d) / 60)} min`);
+    }
+});
+
+test('bad dayIdx / restEnd in imports are neutralised', async () => {
+  const { normalize } = await import('../js/store.js');
+  const s = normalize({ workouts: [{ date: 1, dayIdx: -5, entries: [] }], active: { started: 1, restEnd: 'abc', entries: [] } });
+  assert.equal(s.workouts[0].dayIdx, null);
+  assert.equal(s.active.restEnd, undefined);
+  assert.equal(nextDayIndex({ id: 'p', days: [{}, {}, {}] }, [{ planId: 'p', dayIdx: -5 }]), 0);
+});

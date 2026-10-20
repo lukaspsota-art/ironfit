@@ -71,17 +71,20 @@ function cleanPlan(p) {
 function cleanActive(a) {
   if (!a || typeof a !== 'object' || !Array.isArray(a.entries) || !Number.isFinite(+a.started)) return null;
   return {
-    ...a,
     id: ID.test(a.id) ? a.id : 'w' + Date.now().toString(36),
     started: +a.started,
     name: str(a.name) || 'Tréning',
+    planId: typeof a.planId === 'string' ? a.planId : null,
+    dayIdx: Number.isInteger(a.dayIdx) && a.dayIdx >= 0 ? a.dayIdx : null,
+    deload: !!a.deload,
     prs: cleanPrs(a.prs),
+    ...(Number.isFinite(+a.restEnd) && a.restEnd !== null && a.restEnd !== '' ? { restEnd: +a.restEnd } : {}),
     entries: a.entries
       .filter((e) => e && typeof e.exId === 'string')
       .map((e) => {
         const t = e.target && typeof e.target === 'object' ? e.target : {};
         const g = e.sug && typeof e.sug === 'object' ? e.sug : {};
-        const repsMin = num(t.repsMin, 1) || 8;
+        const repsMin = Number.isFinite(+t.repsMin) && +t.repsMin >= 1 ? +t.repsMin : 8;
         return {
           exId: e.exId,
           target: { pattern: str(t.pattern), sets: Math.max(1, num(t.sets, 1)), repsMin, repsMax: Math.max(repsMin, num(t.repsMax, 1)), rest: num(t.rest) },
@@ -109,7 +112,7 @@ export function normalize(s) {
         name: str(w.name),
         duration: num(w.duration),
         planId: typeof w.planId === 'string' ? w.planId : null,
-        dayIdx: Number.isInteger(w.dayIdx) ? w.dayIdx : null,
+        dayIdx: Number.isInteger(w.dayIdx) && w.dayIdx >= 0 ? w.dayIdx : null,
         deload: !!w.deload,
         prs: cleanPrs(w.prs),
         entries: w.entries

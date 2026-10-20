@@ -476,10 +476,10 @@ export default [
     increment: 5,
     primary: ['glutes'],
     secondary: ['hamstrings', 'quads', 'core'],
-    summary: 'Najlepší izolovaný cvik na zadok. Horný chrbát je opretý, boky tlačia závažie nahor.',
+    summary: 'Jeden z najlepších cvikov na sedacie svaly. Horný chrbát je opretý, boky tlačia závažie nahor.',
     setup: [
-      'Sadni si na zem, horný chrbát oprieť o okraj lavice (pod lopatkami).',
-      'Ramenné/bedrové podložky nastav tesne nad panvové kosti.',
+      'Sadni si na zem, horný chrbát opri o okraj lavice (pod lopatkami).',
+      'Bedrový pás alebo podložku nastav tesne nad panvové kosti.',
       'Chodidlá na šírku bokov, kolená v hornej polohe cca 90°.',
     ],
     steps: [
@@ -519,7 +519,7 @@ export default [
     secondary: ['hamstrings', 'lowback'],
     summary: 'Izolácia zadku v stoji. Opretý o hrudnú podložku tlačíš nohou dozadu proti odporu.',
     setup: [
-      'Hrudník oprieť o podložku, rukami sa chyť držiakov.',
+      'Hrudník opri o podložku, rukami sa chyť držiakov.',
       'Pracovnú nohu polož chodidlom (alebo lýtkom) na pohyblivú podložku.',
       'Opornú nohu mierne pokrč.',
     ],
@@ -554,7 +554,7 @@ export default [
     secondary: ['core'],
     summary: 'Roztláčaš kolená od seba proti podložkám. Zaťažuje bočnú časť zadku a vonkajšie stehná.',
     setup: [
-      'Sadni si, chrbát oprieť o operadlo, kolená vnútri podložiek.',
+      'Sadni si, chrbát opri o operadlo, kolená daj medzi podložky.',
       'Nastav štartovnú polohu tak, aby si cítil mierne natiahnutie.',
     ],
     steps: [
@@ -588,7 +588,7 @@ export default [
     secondary: ['core'],
     summary: 'Stláčaš kolená k sebe proti podložkám. Posilňuje vnútorné stehná.',
     setup: [
-      'Sadni si, chrbát oprieť o operadlo, podložky nastav na vnútornú stranu kolien.',
+      'Sadni si, chrbát opri o operadlo, podložky nastav na vnútornú stranu kolien.',
       'Nastav štartovnú polohu tak, aby si cítil jemné natiahnutie, nie bolesť.',
     ],
     steps: [
