@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { e1rm, records, newRecords, muscleFatigue, plates, streakWeeks, weeklySets } from '../js/stats.js';
 import { generatePlan, suggest, nextDayIndex, swapItem, isDeload, SPLITS } from '../js/planner.js';
 import { EXERCISES, MUSCLES, PATTERNS, EQUIP } from '../js/data/exercises.js';
-import { skeleton, poseAt } from '../js/anim.js';
+import { solve, poseAt } from '../js/anim.js';
 
 const exById = Object.fromEntries(EXERCISES.map((e) => [e.id, e]));
 const DAY = 864e5;
@@ -136,9 +136,75 @@ test('exercise data integrity', () => {
     for (const m of [...e.primary, ...e.secondary]) assert.ok(MUSCLES[m], `${e.id} muscle ${m}`);
     assert.ok(e.anim.poses.length >= 2, `${e.id} poses`);
     for (const p of [0, 0.5, 1]) {
-      const j = skeleton(poseAt(e.anim.poses, p));
+      const j = solve(e.anim, poseAt(e.anim.poses, p));
       for (const [k, v] of Object.entries(j)) assert.ok(v.every(Number.isFinite), `${e.id} ${k} NaN`);
     }
   }
   for (const p of Object.keys(PATTERNS)) assert.ok(EXERCISES.some((e) => e.pattern === p), `no exercise for pattern ${p}`);
+});
+
+test('deload sessions do not reset progression; stalls always get lighter', async () => {
+  const item = { exId: 'chest-press', pattern: 'hpush', sets: 3, repsMin: 8, repsMax: 12 };
+  const ex = exById['chest-press'];
+  const ws = [W(1, 'chest-press', [[100, 10], [100, 10], [100, 10]]), W(2, 'chest-press', [[90, 10], [90, 10]], { deload: true })];
+  assert.equal(suggest(item, ex, ws).kg, 100);
+  const light = suggest(item, { increment: 2.5 }, [W(1, 'chest-press', [[10, 5]]), W(2, 'chest-press', [[10, 5]])]);
+  assert.equal(light.kg, 7.5);
+  assert.equal(suggest(item, { increment: 2.5 }, [W(1, 'chest-press', [[10, 10]])], { deload: true }).kg, 7.5);
+});
+
+test('workoutRecords: computed from final sets, skips first session', async () => {
+  const { workoutRecords } = await import('../js/stats.js');
+  const prev = [W(1, 'bench-press', [[60, 8]])];
+  assert.deepEqual(workoutRecords(prev, [{ exId: 'bench-press', sets: [{ kg: 65, reps: 3, done: true }] }]), [{ exId: 'bench-press', label: 'Najvyššia váha', kg: 65, reps: 3 }]);
+  assert.deepEqual(workoutRecords(prev, [{ exId: 'bench-press', sets: [{ kg: 60, reps: 8, done: true }] }]), []);
+  assert.deepEqual(workoutRecords([], [{ exId: 'bench-press', sets: [{ kg: 60, reps: 8, done: true }] }]), []);
+});
+
+test('normalize survives hostile / old backups', async () => {
+  const { normalize } = await import('../js/store.js');
+  assert.throws(() => normalize(null));
+  assert.throws(() => normalize([]));
+  const s = normalize({
+    settings: { goal: 'x', days: 9, minutes: '60', bar: -5, exclude: 'abc', theme: '<b>' },
+    plan: { days: [{ items: 'nope' }], settings: { goal: 'zzz' } },
+    active: { started: 5, entries: [{ exId: 'nope', sets: 'x' }, null] },
+    workouts: [
+      { id: 'a/b', date: 2, entries: [{ exId: 'bench-press', sets: [{ kg: '-3', reps: 'x', done: 1 }] }], prs: 'zz' },
+      { id: 'dup', date: 3, entries: [] }, { id: 'dup', date: 4, entries: [] }, { date: 'x', entries: [] },
+    ],
+  });
+  assert.equal(s.settings.goal, 'hypertrofia');
+  assert.equal(s.settings.days, 3);
+  assert.equal(s.settings.minutes, 60);
+  assert.equal(s.settings.bar, 20);
+  assert.deepEqual(s.settings.exclude, []);
+  assert.equal(s.settings.theme, 'auto');
+  assert.equal(s.plan, null);
+  assert.deepEqual(s.active.entries[0].sets, []);
+  assert.equal(s.workouts.length, 3);
+  assert.match(s.workouts[0].id, /^[\w-]+$/);
+  assert.deepEqual(s.workouts[0].prs, []);
+  assert.deepEqual(s.workouts[0].entries[0].sets[0], { kg: 0, reps: 0, done: true });
+  assert.notEqual(s.workouts[1].id, s.workouts[2].id);
+});
+
+test('plan quality: strength uses main barbell lifts, volume capped, adductors not in glute slot', async () => {
+  const { planVolume } = await import('../js/planner.js');
+  const s = generatePlan({ days: 3, goal: 'sila', level: 'pokrocily', minutes: 60 }, EXERCISES, 1);
+  const ids = s.days.flatMap((d) => d.items.map((i) => i.exId));
+  for (const id of ['back-squat', 'bench-press', 'deadlift']) assert.ok(ids.includes(id), id);
+  for (const d of s.days) for (const it of d.items) {
+    const ex = exById[it.exId];
+    if (it.repsMax <= 6) assert.ok(['barbell', 'machine', 'dumbbell'].includes(ex.equip) && ex.pattern !== 'lunge', `${it.exId} heavy`);
+  }
+  for (const days of [4, 5, 6]) {
+    const p = generatePlan({ days, goal: 'hypertrofia', level: 'pokrocily', minutes: 90 }, EXERCISES, 1);
+    const v = planVolume(p.days, exById);
+    for (const m of ['chest', 'back', 'quads', 'hamstrings', 'glutes', 'biceps', 'triceps']) {
+      assert.ok(v[m] <= 20, `${days}d ${m}=${v[m]}`);
+      assert.ok(v[m] >= 8, `${days}d ${m}=${v[m]}`);
+    }
+    assert.ok(!p.days.some((d) => d.items.some((i) => i.exId === 'hip-adduction')));
+  }
 });

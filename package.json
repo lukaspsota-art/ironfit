@@ -1,0 +1,6 @@
+{
+  "name": "ironfit",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node --test tests/logic.test.mjs" }
+}

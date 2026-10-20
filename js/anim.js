@@ -1,4 +1,4 @@
-// 2D side-view figure animation (forward kinematics) + simple machine drawing.
+// 2D figure animation (forward kinematics) + simple machine drawing. Side view by default.
 // Angles are absolute, in degrees: 0 = up, 90 = forward (right), 180 = down, 270/-90 = back.
 // A pose: { hip:[x,y], torso, thigh, shin, foot?, uarm, farm, thigh2?, shin2?, foot2?, uarm2?, farm2?, head?, s? }
 // "2" limbs are the far side (drawn faded); they default to the near-side angles.
@@ -9,9 +9,41 @@ const rad = (d) => (d * Math.PI) / 180;
 const go = (p, a, l) => [p[0] + l * Math.sin(rad(a)), p[1] - l * Math.cos(rad(a))];
 const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 
+// anim.mode = 'front' | 'top': symmetric figure seen from the front / from above, for movements
+// in the frontal or horizontal plane (lateral raise, fly, hip abduction). Angles mirror for the
+// left side: 0 = up (top view: forward), 90 = outward, 180 = down. Pose keys:
+// { cx?, y?, uarm, farm, thigh?, shin?, tl?, sl? } — tl/sl scale thigh/shin length (foreshortening).
+export function symSkeleton(pose, top = false) {
+  const cx = pose.cx ?? 100;
+  const y = pose.y ?? (top ? 100 : 60);
+  const mir = (p) => [2 * cx - p[0], p[1]];
+  const side = (sh, hip) => {
+    const elbow = go(sh, pose.uarm, SEG.uarm);
+    const wrist = go(elbow, pose.farm, SEG.farm);
+    const knee = hip && go(hip, pose.thigh ?? 180, SEG.thigh * (pose.tl ?? 1));
+    const ankle = hip && go(knee, pose.shin ?? 180, SEG.shin * (pose.sl ?? 1));
+    return { elbow, wrist, knee, ankle };
+  };
+  const shoulderR = [cx + (top ? 17 : 15), top ? y : y + 4];
+  const hipR = top ? null : [cx + 9, y + 46];
+  const r = side(shoulderR, hipR);
+  const j = {
+    head: top ? [cx, y] : [cx, y - 14],
+    neck: [cx, y],
+    pelvis: [cx, y + 46],
+    shoulderR, shoulderL: mir(shoulderR),
+    elbowR: r.elbow, elbowL: mir(r.elbow), wristR: r.wrist, wristL: mir(r.wrist),
+  };
+  if (!top) Object.assign(j, { hipR, hipL: mir(hipR), kneeR: r.knee, kneeL: mir(r.knee), ankleR: r.ankle, ankleL: mir(r.ankle) });
+  // aliases so props/gear can use side-view names
+  const alias = { shoulder: j.shoulderR, elbow: j.elbowR, wrist: j.wristR, wrist2: j.wristL, hip: j.pelvis, knee: j.kneeR, knee2: j.kneeL, ankle: j.ankleR, ankle2: j.ankleL };
+  for (const k in alias) if (alias[k]) j[k] = alias[k];
+  return j;
+}
+
 // anim.fix = ['ankle', x, y] pins that joint (poses may then omit hip).
 export function solve(anim, pose) {
-  const j = skeleton(pose);
+  const j = anim.mode ? symSkeleton(pose, anim.mode === 'top') : skeleton(pose);
   if (!anim.fix) return j;
   const [name, x, y] = anim.fix;
   const dx = x - j[name][0];
@@ -83,6 +115,21 @@ const FRONT = [
   ['torso', 'hip', 'neck'],
   ['arm', 'shoulder', 'elbow', 'wrist'],
 ];
+const SYM = [
+  ['thigh', 'hipR', 'kneeR', 'ankleR'],
+  ['thigh', 'hipL', 'kneeL', 'ankleL'],
+  ['torso', 'neck', 'pelvis'],
+  ['torso', 'hipL', 'hipR'],
+  ['torso', 'shoulderL', 'shoulderR'],
+  ['arm', 'shoulderR', 'elbowR', 'wristR'],
+  ['arm', 'shoulderL', 'elbowL', 'wristL'],
+];
+const TOP = [
+  ['torso', 'shoulderL', 'shoulderR'],
+  ['arm', 'shoulderR', 'elbowR', 'wristR'],
+  ['arm', 'shoulderL', 'elbowL', 'wristL'],
+];
+const MODE_LABEL = { front: 'pohľad spredu', top: 'pohľad zhora' };
 
 // Draw an exercise animation into `svg`. Returns { set(p), destroy() }.
 export function createFigure(svg, anim) {
@@ -97,9 +144,10 @@ export function createFigure(svg, anim) {
   const back = el('g', { class: 'fx-back' }, svg);
   const front = el('g', { class: 'fx-body' }, svg);
   const mk = (g, [name]) => el('polyline', { class: hl.has(name.replace('2', '')) ? 'hl' : '' }, g);
-  const backLines = LIMBS.map((d) => [d, mk(back, d)]);
-  const frontLines = FRONT.map((d) => [d, mk(front, d)]);
-  const head = el('circle', { r: SEG.head, class: 'fx-head' }, front);
+  const backLines = anim.mode ? [] : LIMBS.map((d) => [d, mk(back, d)]);
+  const frontLines = (anim.mode === 'top' ? TOP : anim.mode ? SYM : FRONT).map((d) => [d, mk(front, d)]);
+  const head = el('circle', { r: anim.mode === 'top' ? 11 : SEG.head, class: 'fx-head' }, front);
+  if (anim.mode) el('text', { x: 6, y: 14, class: 'fx-label' }, svg).textContent = MODE_LABEL[anim.mode];
   const gGear = el('g', { class: 'fx-gear' }, svg);
   const gear = (anim.gear || []).map((g) => ({ g, node: el('g', {}, gGear) }));
   for (const { g, node } of gear) drawGear(g, node);
@@ -127,7 +175,8 @@ export function createFigure(svg, anim) {
     for (const { g, node } of gear) {
       const [x, y] = at(j, g.at);
       const [dx, dy] = g.offset || [0, 0];
-      node.setAttribute('transform', `translate(${(x + dx).toFixed(1)},${(y + dy).toFixed(1)})`);
+      const rot = g.rot && g.kind !== 'platform' ? ` rotate(${g.rot})` : '';
+      node.setAttribute('transform', `translate(${(x + dx).toFixed(1)},${(y + dy).toFixed(1)})${rot}`);
     }
   }
 
@@ -161,21 +210,33 @@ function drawGear(g, node) {
 // Mounts an animated figure with play/pause + scrubber. Respects prefers-reduced-motion.
 export function mountPlayer(container, anim, { label = 'Animácia cviku' } = {}) {
   container.innerHTML = `
-    <svg class="fx" role="img" aria-label="${label}"></svg>
+    <svg class="fx" role="img"></svg>
     <div class="fx-ctrl">
       <button type="button" class="btn icon" data-act="toggle" aria-label="Pozastaviť animáciu">❚❚</button>
       <input type="range" min="0" max="1000" value="0" aria-label="Fáza pohybu">
       <span class="fx-phase" aria-live="off">Štart</span>
     </div>`;
   const svg = container.querySelector('svg');
+  svg.setAttribute('aria-label', label);
   const btn = container.querySelector('button');
   const range = container.querySelector('input');
   const phase = container.querySelector('.fx-phase');
   const fig = createFigure(svg, anim);
   const D = (anim.tempo || 1) * 3600;
-  // timeline: hold 0.4s, concentric 1.2s, hold 0.4s, eccentric 1.6s (scaled by tempo)
+  // anim.motion: 'lift' (default) = p 0→1 is the effort; 'lower' = p 0→1 is the controlled descent
+  // (squats, RDL, lunges start standing); 'loop' = continuous cycle, last pose equals first (cardio).
+  const motion = anim.motion || 'lift';
   const cycle = (ms) => {
     const t = (ms % D) / D;
+    if (motion === 'loop') return [t, 'Plynulý pohyb'];
+    if (motion === 'lower') {
+      if (t < 0.11) return [0, 'Štart'];
+      if (t < 0.5) return [ease((t - 0.11) / 0.39), 'Spúšťanie pomaly (nádych)'];
+      if (t < 0.58) return [1, 'Spodná poloha'];
+      if (t < 0.9) return [1 - ease((t - 0.58) / 0.32), 'Záber hore (výdych)'];
+      return [0, 'Štart'];
+    }
+    // hold 0.4s, concentric 1.2s, hold 0.4s, eccentric 1.6s (scaled by tempo)
     if (t < 0.11) return [0, 'Štart'];
     if (t < 0.44) return [ease((t - 0.11) / 0.33), 'Záber (výdych)'];
     if (t < 0.55) return [1, 'Kontrakcia'];
@@ -209,7 +270,7 @@ export function mountPlayer(container, anim, { label = 'Animácia cviku' } = {})
   range.addEventListener('input', () => {
     setPlaying(false);
     const p = range.value / 1000;
-    render(p, p < 0.05 ? 'Štart' : p > 0.95 ? 'Kontrakcia' : 'Pohyb');
+    render(p, motion === 'loop' ? 'Plynulý pohyb' : p < 0.05 ? 'Štart' : p > 0.95 ? (motion === 'lower' ? 'Spodná poloha' : 'Kontrakcia') : 'Pohyb');
   });
   // pause when off-screen
   const io = new IntersectionObserver(([e]) => {
@@ -219,9 +280,4 @@ export function mountPlayer(container, anim, { label = 'Animácia cviku' } = {})
   io.observe(container);
   setPlaying(playing);
   return { destroy: () => { cancelAnimationFrame(raf); io.disconnect(); } };
-}
-
-// Static thumbnail (start→end ghost) as SVG markup string for lists.
-export function thumb(svg, anim) {
-  createFigure(svg, anim).set(0.65);
 }

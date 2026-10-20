@@ -38,6 +38,7 @@ export default [
       gear: [{ kind: 'handle', at: 'wrist' }],
       poses: [
         { hip: [100, 130], torso: -10, thigh: 92, shin: 180, uarm: 8, farm: 4 },
+        { hip: [100, 130], torso: -12, thigh: 92, shin: 180, uarm: 35, farm: -10 },
         { hip: [100, 130], torso: -14, thigh: 92, shin: 180, uarm: 192, farm: 18 },
       ],
     },
@@ -72,11 +73,13 @@ export default [
     tips: ['Ak nezvládaš celé zhyby, použi gumu alebo asistovaný stroj, prípadne pomalé spúšťanie.', 'Predstav si, že lakte ťaháš do rebier.'],
     anim: {
       hl: ['arm'],
-      machine: [['line', { x1: 66, y1: 26, x2: 130, y2: 26 }], post(66, 26, 40), post(130, 26, 40)],
+      floor: false,
+      machine: [['line', { x1: 66, y1: 10, x2: 130, y2: 10 }], post(66, 10, 22), post(130, 10, 22)],
+      fix: ['wrist', 98, 10],
       gear: [{ kind: 'handle', at: 'wrist' }],
       poses: [
-        { hip: [99, 112], torso: -10, thigh: 160, shin: 240, foot: 240, uarm: 5, farm: 5 },
-        { hip: [117, 72], torso: -10, thigh: 160, shin: 240, foot: 240, uarm: 250, farm: 30 },
+        { torso: -4, thigh: 172, shin: 212, foot: 120, uarm: 4, farm: 2 },
+        { torso: -10, thigh: 165, shin: 212, foot: 120, uarm: -95, farm: 12 },
       ],
     },
   },
@@ -277,14 +280,16 @@ export default [
       gear: [{ kind: 'handle', at: 'wrist' }],
       poses: [
         { torso: -5, thigh: 180, shin: 180, foot: 90, uarm: 92, farm: 92 },
-        { torso: -5, thigh: 180, shin: 180, foot: 90, uarm: 268, farm: 30 },
+        { torso: -5, thigh: 180, shin: 180, foot: 90, uarm: 95, farm: 60 },
+        { torso: -5, thigh: 180, shin: 180, foot: 90, uarm: 150, farm: 45 },
+        { torso: -5, thigh: 180, shin: 180, foot: 90, uarm: 255, farm: 35 },
       ],
     },
   },
   {
     id: 'reverse-pec-deck',
-    name: 'Zadné ramená na peck decku',
-    machine: 'Pec deck / reverse fly (peck deck s opierkou hrudníka)',
+    name: 'Zadné ramená na pec decku',
+    machine: 'Pec deck / reverse fly (pec deck s opierkou hrudníka)',
     equip: 'machine',
     pattern: 'rearDelt',
     compound: false,
@@ -312,11 +317,13 @@ export default [
     tips: ['Ľahké váhy a pomalé opakovania fungujú lepšie ako ťažké.', 'Ruky drž rovnobežne s podlahou.'],
     anim: {
       hl: ['arm'],
-      machine: [seat(90, 147, 34), post(90, 154), pad(108, 92, 108, 130), post(112, 130, 182)],
-      gear: [{ kind: 'handle', at: 'wrist' }],
+      mode: 'top',
+      floor: false,
+      machine: [['line', { x1: 88, y1: 86, x2: 112, y2: 86, 'stroke-width': 7, 'stroke-linecap': 'round' }]],
+      gear: [{ kind: 'handle', at: 'wristR' }, { kind: 'handle', at: 'wristL' }],
       poses: [
-        { hip: [90, 140], torso: 8, thigh: 92, shin: 180, uarm: 90, farm: 90 },
-        { hip: [90, 140], torso: 8, thigh: 92, shin: 180, uarm: 250, farm: 250 },
+        { uarm: 15, farm: 10 },
+        { uarm: 100, farm: 100 },
       ],
     },
   },
@@ -350,7 +357,7 @@ export default [
     anim: {
       hl: ['arm'],
       fix: ['ankle', 100, 176],
-      gear: [{ kind: 'barbell', at: 'wrist', offset: [0, 0] }],
+      gear: [{ kind: 'dumbbell', at: 'wrist' }],
       poses: [
         { torso: 0, thigh: 180, shin: 180, foot: 90, uarm: 182, farm: 176 },
         { torso: 0, thigh: 180, shin: 180, foot: 90, uarm: 172, farm: 20 },
@@ -452,11 +459,11 @@ export default [
       'S nádychom pomaly spúšťaj do vystretia.',
     ],
     mistakes: ['Hojdanie trupom.', 'Lakte idú dopredu.', 'Zalamovanie zápästí.'],
-    tips: ['Môžeš striedať ruky alebo zdvíhať obe naraz.'],
+    tips: ['Môžeš striedať ruky alebo zdvíhať obe naraz.', 'Činka je v animácii otočená o 90°: palec smeruje hore (neutrálny úchop).'],
     anim: {
       hl: ['arm'],
       fix: ['ankle', 100, 176],
-      gear: [{ kind: 'dumbbell', at: 'wrist' }],
+      gear: [{ kind: 'dumbbell', at: 'wrist', rot: 90 }],
       poses: [
         { torso: 0, thigh: 180, shin: 180, foot: 90, uarm: 182, farm: 180 },
         { torso: 0, thigh: 180, shin: 180, foot: 90, uarm: 172, farm: 20 },
@@ -497,8 +504,8 @@ export default [
       machine: [pad(62, 150, 104, 112), post(86, 128, 182), post(44, 168, 182)],
       gear: [{ kind: 'pad', at: 'ankle', offset: [-4, -7], r: 6 }],
       poses: [
-        { hip: [100, 100], torso: 165, thigh: 225, shin: 225, foot: 235, uarm: 180, farm: 180 },
-        { hip: [100, 100], torso: 45, thigh: 225, shin: 225, foot: 235, uarm: 180, farm: 180 },
+        { hip: [100, 100], torso: 165, thigh: 225, shin: 225, foot: 235, uarm: 285, farm: 65 },
+        { hip: [100, 100], torso: 45, thigh: 225, shin: 225, foot: 235, uarm: 165, farm: -55 },
       ],
     },
   },
@@ -580,7 +587,7 @@ export default [
   },
   {
     id: 'hanging-knee-raise',
-    name: 'Prednožovanie vo vise',
+    name: 'Prítahy kolien vo vise',
     machine: 'Hrazda na zhyby alebo vis na lakte',
     equip: 'bodyweight',
     pattern: 'core',
@@ -607,6 +614,7 @@ export default [
     tips: ['Ak ti stačí sila, skús zdvíhať aj vystreté nohy.', 'Spevni plecia, nech nevisíš „na väzoch“.'],
     anim: {
       hl: ['torso', 'thigh'],
+      fix: ['wrist', 100, 12],
       machine: [['line', { x1: 66, y1: 12, x2: 134, y2: 12 }], post(66, 12, 26), post(134, 12, 26)],
       gear: [{ kind: 'handle', at: 'wrist' }],
       poses: [

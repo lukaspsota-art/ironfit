@@ -68,6 +68,20 @@ export function newRecords(prevWorkouts, exId, earlierSets, set) {
   return r.maxReps ? hits : [];
 }
 
+// Records set in a finished workout, one per exercise (best category). First-ever sessions don't count.
+export function workoutRecords(prevWorkouts, entries) {
+  const out = [];
+  for (const exId of new Set(entries.map((e) => e.exId))) {
+    const before = records(prevWorkouts, exId);
+    if (!before.maxReps) continue;
+    const after = records([...prevWorkouts, { date: 0, entries: entries.filter((e) => e.exId === exId) }], exId);
+    if (after.maxKg && after.maxKg.value > (before.maxKg?.value ?? 0)) out.push({ exId, label: 'Najvyššia váha', kg: after.maxKg.kg, reps: after.maxKg.reps });
+    else if (after.e1rm && after.e1rm.value > (before.e1rm?.value ?? 0) + 0.01) out.push({ exId, label: 'Odhadované 1RM', kg: after.e1rm.kg, reps: after.e1rm.reps });
+    else if (!after.maxKg && after.maxReps.value > before.maxReps.value) out.push({ exId, label: 'Najviac opakovaní', kg: 0, reps: after.maxReps.value });
+  }
+  return out;
+}
+
 // Fatigue 0..100 per muscle from sets in the last `hours`, decaying linearly.
 // Primary muscle counts 1 per set, secondary 0.5; ~6 fresh effective sets = 100 %.
 export function muscleFatigue(workouts, exById, now = Date.now(), hours = 72) {
@@ -118,7 +132,13 @@ export function plates(target, bar = 20, inventory = [25, 20, 15, 10, 5, 2.5, 1.
 }
 
 export function streakWeeks(workouts, now = Date.now()) {
-  const week = (t) => Math.floor((t - 4 * DAY) / (7 * DAY)); // weeks start Monday
+  // local Monday 00:00, counted in whole weeks (round() absorbs DST hour shifts)
+  const week = (t) => {
+    const d = new Date(t);
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    return Math.round(d.getTime() / (7 * DAY));
+  };
   const weeks = new Set(workouts.map((w) => week(w.date)));
   let n = 0;
   let k = week(now);

@@ -1,7 +1,7 @@
 import { EXERCISES, MUSCLES, PATTERNS, EQUIP } from './data/exercises.js';
 import * as store from './store.js';
 import { createFigure, mountPlayer } from './anim.js';
-import { records, exerciseHistory, newRecords, muscleFatigue, weeklySets, plates, streakWeeks, doneSets, e1rm } from './stats.js';
+import { records, exerciseHistory, newRecords, workoutRecords, muscleFatigue, weeklySets, plates, streakWeeks, doneSets, e1rm } from './stats.js';
 import { GOALS, LEVELS, SPLIT_NAMES, generatePlan, swapItem, suggest, nextDayIndex, planWeek, isDeload } from './planner.js';
 
 const exById = Object.fromEntries(EXERCISES.map((e) => [e.id, e]));
@@ -21,11 +21,14 @@ const fmtKg = (n) => (Math.round(n * 10) / 10).toLocaleString('sk-SK');
 const fmtDate = (t, opts = { day: 'numeric', month: 'numeric', year: 'numeric' }) => new Date(t).toLocaleDateString('sk-SK', opts);
 const fmtDur = (sec) => {
   const m = Math.round(sec / 60);
+  if (m < 1) return '<1 min';
   return m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`;
 };
 const mm = (sec) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
 const muscles = (list) => list.map((m) => MUSCLES[m]).join(', ');
 const repRange = (it) => (it.pattern === 'cardio' ? `${it.repsMin} min` : it.repsMin === it.repsMax ? `${it.repsMin}` : `${it.repsMin}–${it.repsMax}`);
+// Slovak plural: 1 / 2–4 / 0, 5+
+const plural = (n, one, few, many) => (n === 1 ? one : n >= 2 && n <= 4 ? few : many);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
 // ---------- UI feedback ----------
@@ -106,7 +109,10 @@ function fatigueOfDay(day, fatigue) {
   return [...ms].reduce((s, m) => s + (fatigue[m] || 0), 0) / ms.size;
 }
 
-function startWorkout(dayIdx) {
+async function startWorkout(dayIdx) {
+  if (S().active && !(await confirmDialog(`Práve prebieha tréning „${S().active.name}“. Zahodiť ho a začať nový?`, 'Zahodiť a začať', true))) {
+    return go('#/trening');
+  }
   const p = plan();
   const deload = p && isDeload(p);
   let entries = [];
@@ -147,6 +153,7 @@ function startRest(sec) {
 function renderTimer() {
   clearInterval(timerIv);
   $('.timer')?.remove();
+  document.body.classList.remove('has-timer');
   const end = S().active?.restEnd;
   if (!end || end < Date.now()) return;
   const el = document.createElement('div');
@@ -157,11 +164,13 @@ function renderTimer() {
     <button class="btn small" data-t="15" aria-label="Pridaj 15 sekúnd">+15</button>
     <button class="btn small" data-t="0">Preskočiť</button>`.s;
   document.body.appendChild(el);
+  document.body.classList.add('has-timer');
   const tick = () => {
     const left = (S().active?.restEnd ?? 0) - Date.now();
     if (left <= 0) {
       clearInterval(timerIv);
       el.remove();
+      document.body.classList.remove('has-timer');
       if (S().active?.restEnd) {
         store.update((s) => { if (s.active) delete s.active.restEnd; });
         beep();
@@ -202,10 +211,11 @@ function viewToday() {
   const fatigue = muscleFatigue(s.workouts, exById);
   const weekCount = s.workouts.filter((w) => Date.now() - w.date < 7 * 864e5).length;
   const recentPRs = s.workouts.slice(-10).reverse().flatMap((w) => (w.prs || []).map((r) => ({ ...r, date: w.date }))).slice(0, 5);
-  const statsCard = html`<div class="grid2" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px">
-      <div class="stat"><b>${weekCount}</b><span>tréningy za 7 dní</span></div>
-      <div class="stat"><b>${streakWeeks(s.workouts)}</b><span>týždne v rade</span></div>
-      <div class="stat"><b>${s.workouts.length}</b><span>spolu</span></div></div>`;
+  const streak = streakWeeks(s.workouts);
+  const statsCard = s.workouts.length ? html`<div class="grid2" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px">
+      <div class="stat"><b>${weekCount}</b><span>${plural(weekCount, 'tréning', 'tréningy', 'tréningov')} za 7 dní</span></div>
+      <div class="stat"><b>${streak}</b><span>${plural(streak, 'týždeň', 'týždne', 'týždňov')} v rade</span></div>
+      <div class="stat"><b>${s.workouts.length}</b><span>spolu</span></div></div>` : '';
 
   let main;
   if (s.active) {
@@ -245,10 +255,12 @@ function viewToday() {
     </section>`;
   }
 
-  const fm = Object.entries(fatigue).filter(([m]) => m !== 'cardio').sort((a, b) => b[1] - a[1]);
+  // only muscles that still need rest (recovery < 85 %)
+  const fm = Object.entries(fatigue).filter(([m, v]) => m !== 'cardio' && v > 15).sort((a, b) => b[1] - a[1]);
+  if (!s.workouts.length) return html`${main}`;
   return html`${main}${statsCard}
     <section class="card"><h2>Regenerácia svalov</h2>
-      ${fm.length ? html`<p class="muted">Odhad únavy z tréningov za posledné 3 dni. Zelená = oddýchnuté.</p>
+      ${fm.length ? html`<p class="muted">Odhad z tréningov za posledné 3 dni. Ostatné svaly sú oddýchnuté.</p>
         ${fm.map(([m, v]) => html`<div class="mrow"><span>${MUSCLES[m]}</span><div class="bar"><i class="${v >= 60 ? 'hi' : v >= 30 ? 'mid' : ''}" style="width:${100 - v}%"></i></div><span>${100 - v} %</span></div>`)}`
       : html`<p class="muted">Všetky svaly sú oddýchnuté. Po tréningu tu uvidíš, čo potrebuje pauzu.</p>`}
     </section>
@@ -277,6 +289,7 @@ function viewPlan() {
     <fieldset><legend>Skúsenosti</legend>${seg('level', Object.fromEntries(Object.entries(LEVELS).map(([k, l]) => [k, l.label])), st.level)}</fieldset>
     <fieldset><legend>Dĺžka tréningu</legend>${seg('minutes', { 45: '45 min', 60: '60 min', 75: '75 min', 90: '90 min' }, st.minutes)}</fieldset>
     <p class="muted" id="split-info"></p>
+    <p class="muted" style="font-size:.85rem">Zranenie alebo cvik, ktorý nechceš? <a href="#/nastavenia">Vylúč ho v Nastaveniach</a> a vygeneruj plán znova.</p>
     <button class="btn primary block">${p ? 'Vygenerovať nový plán' : 'Vytvoriť plán'}</button>
   </form>
   ${p ? html`<h2>Tvoj plán · ${SPLIT_NAMES[p.settings.days]}</h2>
@@ -292,7 +305,7 @@ function viewPlan() {
   <details class="card"><summary>Ako funguje automatický plán a progres</summary>
     <ul class="good" style="margin-top:8px">
       <li><b>Rozdelenie:</b> 2–3 dni = celé telo, 4 = horná/spodná, 5 = horná/spodná + push/pull/nohy, 6 = push/pull/nohy 2×. Každý sval tak trénuješ ~2× týždenne.</li>
-      <li><b>Objem:</b> cieľ je cca 10–20 ťažkých sérií na sval za týždeň (Schoenfeld a kol., 2017). Prehľad nájdeš v Pokroku.</li>
+      <li><b>Objem:</b> plán dopočíta série tak, aby hlavné svaly mali cca 10–20 ťažkých sérií týždenne (Schoenfeld a kol., 2017; začiatočník od 8). Pri 2 krátkych tréningoch týždenne to na všetky svaly nevyjde — prednosť majú veľké svaly.</li>
       <li><b>Dvojitá progresia:</b> keď vo všetkých sériách dáš horný počet opakovaní, nabudúce ti appka pridá váhu (2,5 kg, pri nohách 5 kg).</li>
       <li><b>Stagnácia:</b> ak 2 tréningy po sebe nedáš ani spodnú hranicu, váha sa zníži o 10 % a staviaš znova (ako StrongLifts).</li>
       <li><b>Deload:</b> každý 6. týždeň menej sérií a ~90 % váhy na regeneráciu.</li>
@@ -339,6 +352,7 @@ function bindPlan(root) {
 // ---------- workout ----------
 function entryCard(en, ei) {
   const ex = exById[en.exId];
+  if (!ex) return '';
   const it = en.target;
   const cardio = ex.pattern === 'cardio';
   const prev = exerciseHistory(S().workouts, ex.id).at(-1);
@@ -372,7 +386,7 @@ function viewWorkout() {
   }
   const done = a.entries.reduce((n, e) => n + e.sets.filter((s) => s.done).length, 0);
   const total = a.entries.reduce((n, e) => n + e.sets.length, 0);
-  return html`<div class="row between"><div><h1 style="margin:0">${a.name}</h1><small class="muted"><span id="elapsed"></span> · ${done}/${total} sérií${a.deload ? ' · deload' : ''}</small></div>
+  return html`<div class="row between"><div><h1 style="margin:0">${a.name}</h1><small class="muted"><span id="elapsed"></span> · ${done}/${total} ${plural(total, 'séria', 'série', 'sérií')}${a.deload ? ' · deload' : ''}</small></div>
     <button class="btn primary" id="finish">Dokončiť</button></div>
     <div style="height:12px"></div>
     ${a.entries.map(entryCard)}
@@ -436,7 +450,7 @@ function bindWorkout(root) {
     if (!inp) return;
     const ei = +inp.closest('[data-entry]').dataset.entry;
     const si = +inp.closest('[data-set]').dataset.set;
-    store.update((s) => { s.active.entries[ei].sets[si][inp.dataset.f] = inp.value === '' ? '' : Math.max(0, +inp.value); });
+    store.updateSoon((s) => { s.active.entries[ei].sets[si][inp.dataset.f] = inp.value === '' ? '' : Math.max(0, +inp.value || 0); });
   });
   $('#add-ex', root)?.addEventListener('change', (e) => {
     if (!e.target.value) return;
@@ -459,30 +473,26 @@ function toggleSet(ei, si, card) {
   const row = $(`[data-set="${si}"]`, card);
   if (set.done) {
     store.update(() => { set.done = false; });
-    row.classList.remove('done');
-    $('.check', row).setAttribute('aria-pressed', 'false');
-    return;
+    return render();
   }
   // empty fields take their placeholder (previous / suggested values), like Strong/Hevy
   const kgIn = $('[data-f="kg"]', row);
   const repIn = $('[data-f="reps"]', row);
-  const kg = kgIn ? (kgIn.value !== '' ? +kgIn.value : +kgIn.placeholder || 0) : 0;
-  const reps = repIn.value !== '' ? +repIn.value : +repIn.placeholder || 0;
+  const val = (inp) => Math.max(0, (inp.value !== '' ? +inp.value : +inp.placeholder) || 0);
+  const kg = kgIn ? val(kgIn) : 0;
+  const reps = Math.round(val(repIn));
   if (!reps) {
     toast('Zadaj počet opakovaní.');
     repIn.focus();
     return;
   }
+  // live feedback only; the saved records are computed from final sets in finishWorkout
   const prs = exById[en.exId].pattern === 'cardio' ? [] : newRecords(S().workouts, en.exId, en.sets.filter((s, i) => i !== si), { kg, reps });
-  store.update((s) => {
+  store.update(() => {
     Object.assign(set, { kg, reps, done: true });
     // carry weight forward to the next empty set
     const next = en.sets[si + 1];
     if (next && next.kg === '' && kg) next.kg = kg;
-    if (prs.length) {
-      s.active.prs = (s.active.prs || []).filter((r) => r.exId !== en.exId);
-      s.active.prs.push({ exId: en.exId, label: prs[0], kg, reps });
-    }
   });
   if (prs.length) {
     toast(`🏆 Nový rekord: ${prs[0]} — ${kg ? `${fmtKg(kg)} kg × ` : ''}${reps}`);
@@ -498,12 +508,17 @@ async function finishWorkout() {
   if (!done) {
     if (await confirmDialog('Nemáš odškrtnutú žiadnu sériu. Zrušiť tréning bez uloženia?', 'Zrušiť tréning', true)) {
       store.update((s) => { s.active = null; });
+      wakeLock?.release();
+      renderTimer();
       go('#/');
     }
     return;
   }
   const open = a.entries.reduce((n, e) => n + e.sets.filter((s) => !s.done).length, 0);
-  if (open && !(await confirmDialog(`${open} sérií nie je odškrtnutých. Uložiť tréning len s hotovými sériami?`, 'Uložiť'))) return;
+  if (open && !(await confirmDialog(`${open} ${plural(open, 'séria nie je odškrtnutá', 'série nie sú odškrtnuté', 'sérií nie je odškrtnutých')}. Uložiť tréning len s hotovými sériami?`, 'Uložiť'))) return;
+  const entries = a.entries
+    .map((e) => ({ exId: e.exId, sets: e.sets.filter((s) => s.done && +s.reps > 0).map((s) => ({ kg: Math.max(0, +s.kg || 0), reps: +s.reps, done: true })) }))
+    .filter((e) => e.sets.length);
   const w = {
     id: a.id,
     date: a.started,
@@ -511,10 +526,9 @@ async function finishWorkout() {
     name: a.name,
     planId: a.planId,
     dayIdx: a.dayIdx,
-    prs: a.prs || [],
-    entries: a.entries
-      .map((e) => ({ exId: e.exId, sets: e.sets.filter((s) => s.done).map((s) => ({ kg: +s.kg || 0, reps: +s.reps, done: true })) }))
-      .filter((e) => e.sets.length),
+    deload: !!a.deload,
+    prs: workoutRecords(S().workouts, entries.filter((e) => exById[e.exId]?.pattern !== 'cardio')),
+    entries,
   };
   store.update((s) => {
     s.workouts.push(w);
@@ -553,7 +567,7 @@ function bindLibrary(root) {
       card.hidden = !ok;
       n += ok;
     }
-    $('#count', root).textContent = `${n} ${n === 1 ? 'cvik' : n >= 2 && n <= 4 ? 'cviky' : 'cvikov'}`;
+    $('#count', root).textContent = `${n} ${plural(n, 'cvik', 'cviky', 'cvikov')}`;
   };
   root.addEventListener('input', apply);
   apply();
@@ -609,9 +623,9 @@ function bindExercise(root, id) {
 // ---------- progress ----------
 function viewProgress(tab) {
   const ws = S().workouts;
-  const tabs = html`<div class="seg" role="tablist" style="margin-bottom:14px">
-    <a class="btn ${tab !== 'rekordy' ? 'primary' : ''}" style="flex:1" href="#/pokrok" role="tab" aria-selected="${tab !== 'rekordy'}">História</a>
-    <a class="btn ${tab === 'rekordy' ? 'primary' : ''}" style="flex:1" href="#/pokrok/rekordy" role="tab" aria-selected="${tab === 'rekordy'}">Rekordy</a></div>`;
+  const tabs = html`<nav class="seg" aria-label="Pokrok" style="margin-bottom:14px">
+    <a class="btn ${tab !== 'rekordy' ? 'primary' : ''}" style="flex:1" href="#/pokrok" ${tab !== 'rekordy' ? html`aria-current="page"` : ''}>História</a>
+    <a class="btn ${tab === 'rekordy' ? 'primary' : ''}" style="flex:1" href="#/pokrok/rekordy" ${tab === 'rekordy' ? html`aria-current="page"` : ''}>Rekordy</a></nav>`;
   if (!ws.length) return html`<h1>Pokrok</h1>${tabs}<div class="card empty"><p>Zatiaľ žiadny uložený tréning.</p><a class="btn primary" href="#/trening">Začať tréning</a></div>`;
   if (tab === 'rekordy') {
     const rows = EXERCISES.map((ex) => ({ ex, r: records(ws, ex.id) })).filter((x) => x.r.maxReps && x.ex.pattern !== 'cardio')
@@ -629,17 +643,31 @@ function viewProgress(tab) {
   const daysOn = new Set(ws.map((w) => new Date(w.date).toDateString()));
   const cells = [];
   for (let d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) cells.push({ on: daysOn.has(d.toDateString()), today: +d === +today, label: d.toLocaleDateString('sk-SK') });
+  const onCount = cells.filter((c) => c.on).length;
+  // month label above the first week column of each month
+  const months = Array.from({ length: 12 }, (_, w) => {
+    const d = new Date(start);
+    d.setDate(d.getDate() + w * 7);
+    const prev = new Date(d);
+    prev.setDate(prev.getDate() - 7);
+    return w === 0 || prev.getMonth() !== d.getMonth() ? d.toLocaleDateString('sk-SK', { month: 'short' }) : '';
+  });
   const wk = weeklySets(ws, exById);
   const ms = Object.keys(MUSCLES).filter((m) => m !== 'cardio' && wk[m]);
   return html`<h1>Pokrok</h1>${tabs}
-  <section class="card"><h2>Posledných 12 týždňov</h2><div class="cal" role="img" aria-label="Kalendár tréningov: ${daysOn.size} tréningových dní">${cells.map((c) => html`<i class="${c.on ? 'on' : ''} ${c.today ? 'today' : ''}" title="${c.label}"></i>`)}</div></section>
+  <section class="card"><h2>Posledných 12 týždňov</h2>
+    <div class="cal-wrap">
+      <span></span><div class="cal-months" style="grid-template-columns:repeat(12,1fr)">${months.map((m) => html`<span>${m}</span>`)}</div>
+      <div class="cal-days" aria-hidden="true"><span>Po</span><span></span><span>St</span><span></span><span>Pi</span><span></span><span>Ne</span></div>
+      <div class="cal" role="img" aria-label="Kalendár tréningov: ${onCount} ${plural(onCount, 'tréningový deň', 'tréningové dni', 'tréningových dní')} za 12 týždňov">${cells.map((c) => html`<i class="${c.on ? 'on' : ''} ${c.today ? 'today' : ''}" title="${c.label}"></i>`)}</div>
+    </div></section>
   <section class="card"><h2>Série na sval za 7 dní</h2><p class="muted">Odporúčanie pre rast: 10–20 ťažkých sérií týždenne.</p>
     ${ms.length ? ms.map((m) => { const v = wk[m]; return html`<div class="mrow"><span>${MUSCLES[m]}</span><div class="bar"><i class="${v > 22 ? 'hi' : v < 10 ? 'mid' : ''}" style="width:${Math.min(100, (v / 20) * 100)}%"></i></div><span>${fmtKg(v)}</span></div>`; }) : html`<p class="muted">Za posledných 7 dní nič.</p>`}
   </section>
   <section class="card"><h2>Tréningy</h2><ul class="list">${ws.slice().reverse().map((w) => {
     const sets = w.entries.reduce((n, e) => n + e.sets.length, 0);
     const vol = w.entries.reduce((v, e) => v + e.sets.reduce((x, s) => x + s.kg * s.reps, 0), 0);
-    return html`<li><a class="item" href="#/historia/${w.id}"><span class="t"><b>${w.name || 'Tréning'}</b><small>${fmtDate(w.date, { weekday: 'short', day: 'numeric', month: 'numeric', year: 'numeric' })} · ${sets} sérií · ${fmtKg(vol)} kg${w.duration ? ` · ${fmtDur(w.duration)}` : ''}</small></span>${w.prs?.length ? html`<span class="chip p">🏆 ${w.prs.length}</span>` : ''}</a></li>`;
+    return html`<li><a class="item" href="#/historia/${w.id}"><span class="t"><b>${w.name || 'Tréning'}</b><small>${fmtDate(w.date, { weekday: 'short', day: 'numeric', month: 'numeric', year: 'numeric' })} · ${sets} ${plural(sets, 'séria', 'série', 'sérií')} · ${fmtKg(vol)} kg${w.duration ? ` · ${fmtDur(w.duration)}` : ''}</small></span>${w.prs?.length ? html`<span class="chip p">🏆 ${w.prs.length}</span>` : ''}</a></li>`;
   })}</ul></section>`;
 }
 
@@ -765,11 +793,18 @@ function render() {
   player = null;
   const main = $('#main');
   const fresh = document.createElement('div');
-  fresh.innerHTML = view(arg).s;
-  main.replaceChildren(fresh);
-  hydrateThumbs(fresh);
-  bind?.(fresh, arg);
-  document.title = `${typeof title === 'function' ? title(arg) : title} · FitApp`;
+  try {
+    fresh.innerHTML = view(arg).s;
+    main.replaceChildren(fresh);
+    hydrateThumbs(fresh);
+    bind?.(fresh, arg);
+  } catch (err) {
+    console.error(err);
+    fresh.innerHTML = html`<div class="card empty"><h1>Niečo sa pokazilo</h1><p>Táto obrazovka sa nedá zobraziť (${err.message}). Tvoje dáta sú v bezpečí.</p>
+      <a class="btn" href="#/">Domov</a> <a class="btn" href="#/nastavenia">Nastavenia a záloha</a></div>`.s;
+    main.replaceChildren(fresh);
+  }
+  document.title = `${typeof title === 'function' ? title(arg) : title} · IronFit`;
   for (const a of $$('.nav a')) {
     if (a.dataset.nav === nav) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
@@ -783,6 +818,9 @@ function render() {
 }
 
 addEventListener('hashchange', render);
+// another tab changed the data
+store.subscribe(() => { applyTheme(); render(); renderTimer(); });
+addEventListener('fitapp:saveerror', () => toast('⚠ Nedá sa ukladať — úložisko prehliadača je plné alebo zablokované. Stiahni si zálohu.'));
 applyTheme();
 render();
 renderTimer();
